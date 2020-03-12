@@ -33,7 +33,7 @@ fn make_move(board: &mut [u8; 16], indices: &[[usize; 4]; 4], f: i8) -> [u8; 16]
             } else if at != 4 && *value == old_values[at] {
                 old_values[at] = value * 2;
                 old_values[i] = 0;
-                at = 4;
+                at = 4; 
             }
         }
 
@@ -65,12 +65,27 @@ fn make_move(board: &mut [u8; 16], indices: &[[usize; 4]; 4], f: i8) -> [u8; 16]
     new_board
 }
 
-fn match_move(direction: &str, mut board: [u8; 16]) -> [u8; 16] {
+fn match_move(
+    stdout: &mut termion::raw::RawTerminal<std::io::Stdout>,
+    direction: termion::event::Key,
+    mut board: [u8; 16],
+) -> [u8; 16] {
     match direction {
-        "l" => make_move(&mut board, &ROWS, 1),
-        "u" => make_move(&mut board, &COLS, 1),
-        "r" => make_move(&mut board, &ROWS, -1),
-        "d" => make_move(&mut board, &COLS, -1),
+        Key::Left => make_move(&mut board, &ROWS, 1),
+        Key::Up => make_move(&mut board, &COLS, 1),
+        Key::Right => make_move(&mut board, &ROWS, -1),
+        Key::Down => make_move(&mut board, &COLS, -1),
+        Key::Ctrl(_c) => {
+            write!(
+                stdout,
+                "{}{}{}",
+                termion::clear::All,
+                termion::cursor::Show,
+                termion::cursor::Goto(1, 1)
+            )
+            .unwrap();
+            std::process::exit(0)
+        }
         _ => {
             println!("Invalid move, try again!");
             board
@@ -78,14 +93,23 @@ fn match_move(direction: &str, mut board: [u8; 16]) -> [u8; 16] {
     }
 }
 
-fn print_board(board: &[u8; 16]) {
-    println!(
-        "The current board is:\n{:?}\n{:?}\n{:?}\n{:?}.\n",
+fn print_board(stdout: &mut termion::raw::RawTerminal<std::io::Stdout>, board: &[u8; 16]) {
+    write!(
+        stdout,
+        "{}{}The board state:{}{:?}{}{:?}{}{:?}{}{:?}",
+        termion::clear::All,
+        termion::cursor::Goto(1, 1),
+        termion::cursor::Goto(1, 2),
         &board[0..4],
+        termion::cursor::Goto(1, 3),
         &board[4..8],
+        termion::cursor::Goto(1, 4),
         &board[8..12],
+        termion::cursor::Goto(1, 5),
         &board[12..16]
-    );
+    )
+    .unwrap();
+    stdout.flush().unwrap();
 }
 
 fn is_power_of_two(x: i32) -> bool {
@@ -105,7 +129,7 @@ fn main() {
                 if is_power_of_two(num) {
                     break num;
                 } else {
-                    println!("Enter a power of two!");
+                    println!("Enter a power of two! (4, 8, 16, 32, 64, etc.");
                     win_value_string = String::new();
                 }
             }
@@ -121,28 +145,23 @@ fn main() {
     board[1] = 2;
     board.shuffle(&mut thread_rng());
 
-    print_board(&board);
+    let stdin = stdin();
+    let mut stdout = stdout().into_raw_mode().unwrap();
 
-    println!("Valid moves are: l (left), r (right), u (up), d (down).");
+    write!(
+        stdout,
+        "Use the arrow keys to move the board!{}",
+        termion::cursor::Hide
+    )
+    .unwrap();
+    stdout.flush().unwrap();
 
-    loop {
-        let mut direction = String::new();
-        io::stdin()
-            .read_line(&mut direction)
-            .ok()
-            .expect("Failed to read line");
+    print_board(&mut stdout, &board);
 
-        let new_board = match_move(direction.trim(), board);
+    for key in stdin.keys() {
+        let new_board = match_move(&mut stdout, key.unwrap(), board);
 
-        if new_board.iter().any(|&x| x as i32 == win_value) {
-            print_board(&new_board);
-            println!("You win! Congratulations!");
-            break;
-        } else if !new_board.iter().any(|&x| x == 0) {
-            print_board(&board);
-            println!("No, new value can be added, you suck, loser!");
-            break;
-        } else if new_board != board {
+        if new_board != board {
             board = new_board;
             let mut index: Vec<usize> = Vec::new();
             for (i, value) in board.iter().enumerate() {
@@ -155,16 +174,34 @@ fn main() {
                 .unwrap()
                 .0;
             board[*index.choose(&mut thread_rng()).unwrap()] = new_value;
+        }
+
+        if board.iter().any(|&x| x as i32 == win_value) {
+            print_board(&mut stdout, &board);
+            write!(
+                stdout,
+                "{}You win! Congratulations!{}{}",
+                termion::cursor::Goto(1, 6),
+                termion::cursor::Goto(1, 7),
+                termion::cursor::Show
+            )
+            .unwrap();
+            break;
+        } else if !board.iter().any(|&x| x == 0) {
+            print_board(&mut stdout, &board);
+            write!(
+                stdout,
+                "{}No, new value can be added, you suck, loser!{}{}",
+                termion::cursor::Goto(1, 6),
+                termion::cursor::Goto(1, 7),
+                termion::cursor::Show
+            )
+            .unwrap();
+            break;
         } else {
             println!("No change in board.")
         }
 
-        println!(
-            "The current board is:\n{:?}\n{:?}\n{:?}\n{:?}.\n",
-            &board[0..4],
-            &board[4..8],
-            &board[8..12],
-            &board[12..16]
-        );
+        print_board(&mut stdout, &board);
     }
 }
