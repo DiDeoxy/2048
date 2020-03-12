@@ -27,13 +27,13 @@ fn make_move(board: &mut [u8; 16], indices: &[[usize; 4]; 4], f: i8) -> [u8; 16]
         }
 
         let mut at = 4;
-        for (i, value) in old_values.clone().iter().enumerate() {
-            if (at == 4 || *value != old_values[at]) && *value > 0 {
+        for (i, old_value) in old_values.clone().iter().enumerate() {
+            if (at == 4 || *old_value != old_values[at]) && *old_value > 0 {
                 at = i;
             } else if at != 4 && *value == old_values[at] {
-                old_values[at] = value * 2;
+                old_values[at] = old_value * 2;
                 old_values[i] = 0;
-                at = 4; 
+                at = 4;
             }
         }
 
@@ -117,8 +117,8 @@ fn is_power_of_two(x: i32) -> bool {
 }
 
 fn main() {
-    let mut win_value_string = String::new();
     let win_value = loop {
+        let mut win_value_string = String::new();
         println!("What value of a block do you want for the win value? (must be a power of 2).");
         io::stdin()
             .read_line(&mut win_value_string)
@@ -130,12 +130,10 @@ fn main() {
                     break num;
                 } else {
                     println!("Enter a power of two! (4, 8, 16, 32, 64, etc.");
-                    win_value_string = String::new();
                 }
             }
             Err(e) => {
                 println!("Error: {}", e);
-                win_value_string = String::new();
             }
         }
     };
@@ -169,39 +167,38 @@ fn main() {
                     index.push(i)
                 }
             }
-            let new_value = [(2, 9), (4, 1)]
+
+            board[*index.choose(&mut thread_rng()).unwrap()] = [(2, 9), (4, 1)]
                 .choose_weighted(&mut thread_rng(), |item| item.1)
                 .unwrap()
                 .0;
-            board[*index.choose(&mut thread_rng()).unwrap()] = new_value;
-        }
 
-        if board.iter().any(|&x| x as i32 == win_value) {
-            print_board(&mut stdout, &board);
-            write!(
-                stdout,
-                "{}You win! Congratulations!{}{}",
-                termion::cursor::Goto(1, 6),
-                termion::cursor::Goto(1, 7),
-                termion::cursor::Show
-            )
-            .unwrap();
-            break;
-        } else if !board.iter().any(|&x| x == 0) {
-            print_board(&mut stdout, &board);
-            write!(
-                stdout,
-                "{}No, new value can be added, you suck, loser!{}{}",
-                termion::cursor::Goto(1, 6),
-                termion::cursor::Goto(1, 7),
-                termion::cursor::Show
-            )
-            .unwrap();
-            break;
+            if board.iter().any(|&x| x as i32 == win_value) {
+                print_board(&mut stdout, &board);
+                write!(
+                    stdout,
+                    "{}You win! Congratulations!{}{}",
+                    termion::cursor::Goto(1, 6),
+                    termion::cursor::Goto(1, 7),
+                    termion::cursor::Show
+                )
+                .unwrap();
+                break;
+            } else if !board.iter().any(|&x| x == 0) {
+                print_board(&mut stdout, &board);
+                write!(
+                    stdout,
+                    "{}No, new value can be added, you suck, loser!{}{}",
+                    termion::cursor::Goto(1, 6),
+                    termion::cursor::Goto(1, 7),
+                    termion::cursor::Show
+                )
+                .unwrap();
+                break;
+            }
         } else {
             println!("No change in board.")
         }
-
         print_board(&mut stdout, &board);
     }
 }
