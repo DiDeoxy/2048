@@ -15,38 +15,38 @@ fn make_move(board: &mut [u8; 16], indices: &[[usize; 4]; 4], f: i8) -> [u8; 16]
     let mut new_board = [0u8; 16];
 
     for index in indices.iter() {
-        let mut old_values = [0u8; 4];
+        let mut values = [0u8; 4];
         if f > 0 {
             for (i, pos) in index.iter().enumerate() {
-                old_values[i] = board[*pos]
+                values[i] = board[*pos]
             }
         } else {
             for (i, pos) in index.iter().rev().enumerate() {
-                old_values[i] = board[*pos]
+                values[i] = board[*pos]
             }
         }
 
-        let mut at = 4;
-        for (i, old_value) in old_values.clone().iter().enumerate() {
-            if (at == 4 || *old_value != old_values[at]) && *old_value > 0 {
-                at = i;
-            } else if at != 4 && *value == old_values[at] {
-                old_values[at] = old_value * 2;
-                old_values[i] = 0;
-                at = 4;
+        let mut prev = 4;
+        for (i, value) in values.clone().iter().enumerate() {
+            if (prev == 4 || *value != values[prev]) && *value > 0 {
+                prev = i;
+            } else if prev != 4 && *value == values[prev] {
+                values[prev] = value * 2;
+                values[i] = 0;
+                prev = 4;
             }
         }
 
         'outer: loop {
             let mut to = 4;
-            for (i, old_value) in old_values.clone().iter().enumerate() {
+            for (i, old_value) in values.clone().iter().enumerate() {
                 if i == 3 && *old_value == 0 {
                     break 'outer;
                 } else if *old_value == 0 && to == 4 {
                     to = i;
                 } else if *old_value > 0 && to != 4 {
-                    old_values[to] = *old_value;
-                    old_values[i] = 0;
+                    values[to] = *old_value;
+                    values[i] = 0;
                     break;
                 }
             }
@@ -54,49 +54,21 @@ fn make_move(board: &mut [u8; 16], indices: &[[usize; 4]; 4], f: i8) -> [u8; 16]
 
         if f > 0 {
             for (i, pos) in index.iter().enumerate() {
-                new_board[*pos] = old_values[i]
+                new_board[*pos] = values[i]
             }
         } else {
             for (i, pos) in index.iter().rev().enumerate() {
-                new_board[*pos] = old_values[i]
+                new_board[*pos] = values[i]
             }
         }
     }
     new_board
 }
 
-fn match_move(
-    stdout: &mut termion::raw::RawTerminal<std::io::Stdout>,
-    direction: termion::event::Key,
-    mut board: [u8; 16],
-) -> [u8; 16] {
-    match direction {
-        Key::Left => make_move(&mut board, &ROWS, 1),
-        Key::Up => make_move(&mut board, &COLS, 1),
-        Key::Right => make_move(&mut board, &ROWS, -1),
-        Key::Down => make_move(&mut board, &COLS, -1),
-        Key::Ctrl(_c) => {
-            write!(
-                stdout,
-                "{}{}{}",
-                termion::clear::All,
-                termion::cursor::Show,
-                termion::cursor::Goto(1, 1)
-            )
-            .unwrap();
-            std::process::exit(0)
-        }
-        _ => {
-            println!("Invalid move, try again!");
-            board
-        }
-    }
-}
-
 fn print_board(stdout: &mut termion::raw::RawTerminal<std::io::Stdout>, board: &[u8; 16]) {
     write!(
         stdout,
-        "{}{}The board state:{}{:?}{}{:?}{}{:?}{}{:?}",
+        "{}{}The board state:{}{:?}{}{:?}{}{:?}{}{:?}{}Use the arrow keys to move the board!",
         termion::clear::All,
         termion::cursor::Goto(1, 1),
         termion::cursor::Goto(1, 2),
@@ -106,7 +78,8 @@ fn print_board(stdout: &mut termion::raw::RawTerminal<std::io::Stdout>, board: &
         termion::cursor::Goto(1, 4),
         &board[8..12],
         termion::cursor::Goto(1, 5),
-        &board[12..16]
+        &board[12..16],
+        termion::cursor::Goto(1, 6)
     )
     .unwrap();
     stdout.flush().unwrap();
@@ -146,18 +119,29 @@ fn main() {
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
 
-    write!(
-        stdout,
-        "Use the arrow keys to move the board!{}",
-        termion::cursor::Hide
-    )
-    .unwrap();
-    stdout.flush().unwrap();
-
     print_board(&mut stdout, &board);
 
     for key in stdin.keys() {
-        let new_board = match_move(&mut stdout, key.unwrap(), board);
+        let new_board = match key.unwrap() {
+            Key::Left => make_move(&mut board, &ROWS, 1),
+            Key::Up => make_move(&mut board, &COLS, 1),
+            Key::Right => make_move(&mut board, &ROWS, -1),
+            Key::Down => make_move(&mut board, &COLS, -1),
+            Key::Ctrl('c') => {
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::style::Reset,
+                    termion::cursor::Goto(1, 7)
+                )
+                .unwrap();
+                break
+            }
+            _ => {
+                println!("Invalid move, try again!");
+                board
+            }
+        };
 
         if new_board != board {
             board = new_board;
